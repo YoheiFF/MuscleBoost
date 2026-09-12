@@ -1,0 +1,89 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // 本番PostgreSQL移行時は "postgresql" に変更し DATABASE_URL を接続文字列に変更する
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  defaultWeightKg Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customExercises Exercise[]       @relation("UserCustomExercises")
+  workoutSessions WorkoutSession[]
+  weightLogs      WeightLog[]
+}
+
+model Exercise {
+  id                String   @id @default(cuid())
+  name              String
+  // MuscleGroup: "CHEST" | "BACK" | "LEGS" | "SHOULDERS" | "ARMS" | "ABS" | "FULL_BODY" | "CARDIO"
+  muscleGroup       String
+  // IntensityCategory: "LIGHT" | "MODERATE" | "VIGOROUS" | "HIGH_INTENSITY"
+  intensityCategory String
+  metValue          Float
+  description       String?
+  isCustom          Boolean  @default(false)
+  createdByUserId   String?
+  createdByUser     User?    @relation("UserCustomExercises", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workoutLogs WorkoutLog[]
+
+  @@index([createdByUserId])
+  @@index([muscleGroup])
+}
+
+model WorkoutSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  performedAt DateTime
+  memo        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  logs WorkoutLog[]
+
+  @@index([userId, performedAt])
+}
+
+model WorkoutLog {
+  id                    String         @id @default(cuid())
+  workoutSessionId      String
+  workoutSession        WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exerciseId            String
+  exercise              Exercise       @relation(fields: [exerciseId], references: [id])
+  setCount              Int
+  repsPerSet            Int
+  durationMinutes       Float
+  secondsPerSetOverride Int?
+  bodyWeightKgOverride  Float?
+  metValueSnapshot      Float
+  caloriesBurned        Float
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([workoutSessionId])
+  @@index([exerciseId])
+}
+
+model WeightLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg   Float
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId, recordedAt])
+}

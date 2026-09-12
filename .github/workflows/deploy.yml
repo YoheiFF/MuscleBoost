@@ -1,0 +1,29 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH & Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            cd ~/MuscleBoost
+            git fetch origin
+            git reset --hard origin/main
+            npm install
+            npm run build
+            pm2 restart muscleboost 2>/dev/null || pm2 start ecosystem.config.js --env production
+            pm2 save
+            echo "✅ Deploy completed at $(date)"
