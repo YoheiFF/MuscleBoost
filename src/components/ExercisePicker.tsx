@@ -1,5 +1,5 @@
 // src/components/ExercisePicker.tsx
-import { MUSCLE_GROUP_LABELS, INTENSITY_LABELS, type ExerciseDTO } from "@/types";
+import { MUSCLE_GROUP_LABELS, type ExerciseDTO } from "@/types";
 
 interface ExercisePickerProps {
   exercises: ExerciseDTO[];
@@ -20,7 +20,7 @@ export default function ExercisePicker({ exercises, value, onChange, id }: Exerc
       <option value="">マシンを選択してください</option>
       {exercises.map((ex) => (
         <option key={ex.id} value={ex.id}>
-          {ex.name}（{MUSCLE_GROUP_LABELS[ex.muscleGroup]} / {INTENSITY_LABELS[ex.intensityCategory]} / MET {ex.metValue}）
+          {ex.name}（{MUSCLE_GROUP_LABELS[ex.muscleGroup]} / MET {ex.metValue}）
         </option>
       ))}
     </select>

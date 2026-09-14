@@ -4,16 +4,15 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/session-guard";
 import { exerciseInputSchema } from "@/lib/validation";
-import type { ActionResult, ExerciseDTO, MuscleGroup, IntensityCategory } from "@/types";
+import type { ActionResult, ExerciseDTO, MuscleGroup } from "@/types";
 
 function toDTO(row: {
-  id: string; name: string; muscleGroup: string; intensityCategory: string;
+  id: string; name: string; muscleGroup: string;
   metValue: number; description: string | null; isCustom: boolean; createdByUserId: string | null;
 }): ExerciseDTO {
   return {
     ...row,
     muscleGroup: row.muscleGroup as MuscleGroup,
-    intensityCategory: row.intensityCategory as IntensityCategory,
   };
 }
 

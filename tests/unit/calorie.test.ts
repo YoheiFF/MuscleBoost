@@ -1,6 +1,6 @@
 // tests/unit/calorie.test.ts
 import { describe, it, expect } from "vitest";
-import { calculateCalories, estimateDurationMinutes, CALORIE_CORRECTION_FACTOR } from "@/lib/calorie";
+import { calculateCalories, CALORIE_CORRECTION_FACTOR } from "@/lib/calorie";
 
 describe("calculateCalories", () => {
   it("正常系: MET3.0, 体重70kg, 30分 → 110.3kcal", () => {
@@ -42,24 +42,5 @@ describe("calculateCalories", () => {
 
   it("Infinityの場合は0を返す", () => {
     expect(calculateCalories({ metValue: Infinity, weightKg: 70, durationMinutes: 30 })).toBe(0);
-  });
-});
-
-describe("estimateDurationMinutes", () => {
-  it("3セット×60秒/セット=180秒=3分", () => {
-    expect(estimateDurationMinutes(3, 60)).toBe(3.0);
-  });
-
-  it("setCount=0の場合は0を返す", () => {
-    expect(estimateDurationMinutes(0, 60)).toBe(0);
-  });
-
-  it("secondsPerSet=0の場合は0を返す", () => {
-    expect(estimateDurationMinutes(3, 0)).toBe(0);
-  });
-
-  it("負数の場合は0を返す", () => {
-    expect(estimateDurationMinutes(-3, 60)).toBe(0);
-    expect(estimateDurationMinutes(3, -60)).toBe(0);
   });
 });

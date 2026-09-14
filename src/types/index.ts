@@ -5,25 +5,22 @@ export const MUSCLE_GROUPS = [
 ] as const;
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
-export const INTENSITY_CATEGORIES = [
-  "LIGHT", "MODERATE", "VIGOROUS", "HIGH_INTENSITY",
-] as const;
-export type IntensityCategory = (typeof INTENSITY_CATEGORIES)[number];
-
 export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   CHEST: "胸", BACK: "背中", LEGS: "脚", SHOULDERS: "肩",
   ARMS: "腕", ABS: "腹", FULL_BODY: "全身", CARDIO: "有酸素",
 };
 
-export const INTENSITY_LABELS: Record<IntensityCategory, string> = {
-  LIGHT: "軽度", MODERATE: "中等度", VIGOROUS: "高強度", HIGH_INTENSITY: "最高強度",
+export const WEIGHT_UNITS = ["KG", "LB"] as const;
+export type WeightUnit = (typeof WEIGHT_UNITS)[number];
+
+export const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
+  KG: "kg", LB: "lb",
 };
 
 export interface ExerciseDTO {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
-  intensityCategory: IntensityCategory;
   metValue: number;
   description: string | null;
   isCustom: boolean;
@@ -37,9 +34,14 @@ export interface WorkoutLogDTO {
   setCount: number;
   repsPerSet: number;
   durationMinutes: number;
-  bodyWeightKgOverride: number | null;
+  weightValue: number | null;
+  weightUnit: WeightUnit | null;
   metValueSnapshot: number;
   caloriesBurned: number;
+  /** トレーニングボリューム(kg) = 重さ(kg換算後)×setCount×repsPerSet。
+   *  weightValueがnullの場合は0（未入力。UI側で0kgと区別して表示すること）。
+   *  DBには保存されず、Server Action呼び出しの都度サーバー側で計算される。 */
+  volumeKg: number;
 }
 
 export interface WorkoutSessionSummaryDTO {

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { listExercises, deleteCustomExercise } from "@/app/actions/exercises";
-import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, INTENSITY_LABELS, type MuscleGroup } from "@/types";
+import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from "@/types";
 
 interface ExercisesPageProps {
   searchParams: Promise<{ muscleGroup?: string }>;
@@ -57,7 +57,7 @@ export default async function ExercisesPage({ searchParams }: ExercisesPageProps
                 )}
               </p>
               <p className="text-sm text-gray-500">
-                {MUSCLE_GROUP_LABELS[ex.muscleGroup]} / {INTENSITY_LABELS[ex.intensityCategory]} / MET {ex.metValue}
+                {MUSCLE_GROUP_LABELS[ex.muscleGroup]} / MET {ex.metValue}
               </p>
               {ex.description && <p className="mt-1 text-xs text-gray-400">{ex.description}</p>}
             </div>

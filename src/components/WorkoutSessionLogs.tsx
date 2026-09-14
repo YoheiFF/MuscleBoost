@@ -29,11 +29,11 @@ export default function WorkoutSessionLogs({
   const [editSetCount, setEditSetCount] = useState("");
   const [editRepsPerSet, setEditRepsPerSet] = useState("");
   const [editDurationMinutes, setEditDurationMinutes] = useState("");
-  const [editBodyWeightKgOverride, setEditBodyWeightKgOverride] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const totalCalories = Math.round(logs.reduce((sum, l) => sum + l.caloriesBurned, 0) * 10) / 10;
+  const totalVolumeKg = Math.round(logs.reduce((sum, l) => sum + l.volumeKg, 0) * 10) / 10;
 
   function startEdit(log: WorkoutLogDTO) {
     setEditingLog(log);
@@ -41,7 +41,6 @@ export default function WorkoutSessionLogs({
     setEditSetCount(String(log.setCount));
     setEditRepsPerSet(String(log.repsPerSet));
     setEditDurationMinutes(String(log.durationMinutes));
-    setEditBodyWeightKgOverride(log.bodyWeightKgOverride ? String(log.bodyWeightKgOverride) : "");
     setEditError(null);
   }
 
@@ -54,7 +53,6 @@ export default function WorkoutSessionLogs({
       setCount: Number(editSetCount),
       repsPerSet: Number(editRepsPerSet),
       durationMinutes: Number(editDurationMinutes),
-      bodyWeightKgOverride: editBodyWeightKgOverride ? Number(editBodyWeightKgOverride) : undefined,
     });
     setEditSubmitting(false);
     if (!result.ok) {
@@ -74,9 +72,15 @@ export default function WorkoutSessionLogs({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-gray-500">合計消費カロリー</p>
-        <p className="text-2xl font-bold text-gray-900">{totalCalories} kcal</p>
+      <div className="flex flex-wrap gap-6">
+        <div>
+          <p className="text-sm text-gray-500">合計消費カロリー</p>
+          <p className="text-2xl font-bold text-gray-900">{totalCalories} kcal</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">合計トレーニングボリューム（kg換算）</p>
+          <p className="text-2xl font-bold text-gray-900">{totalVolumeKg} kg</p>
+        </div>
       </div>
 
       <section>
@@ -107,6 +111,15 @@ export default function WorkoutSessionLogs({
           <div className="w-full max-w-md rounded-lg bg-white p-4">
             <h3 className="mb-4 text-lg font-semibold">記録を編集</h3>
             {editError && <p className="mb-2 text-sm text-red-600">{editError}</p>}
+            {defaultWeightKg === null && (
+              <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                体重が未設定です。
+                <a href="/profile" className="ml-1 underline">
+                  プロフィール
+                </a>
+                でデフォルト体重を設定してください。
+              </p>
+            )}
             <div className="flex flex-col gap-3">
               <ExercisePicker exercises={exercises} value={editExerciseId} onChange={setEditExerciseId} />
               <input
@@ -129,14 +142,6 @@ export default function WorkoutSessionLogs({
                 value={editDurationMinutes}
                 onChange={(e) => setEditDurationMinutes(e.target.value)}
                 placeholder="運動時間（分）"
-                className="rounded border border-gray-300 px-3 py-2"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={editBodyWeightKgOverride}
-                onChange={(e) => setEditBodyWeightKgOverride(e.target.value)}
-                placeholder="体重（kg・上書き、任意）"
                 className="rounded border border-gray-300 px-3 py-2"
               />
             </div>

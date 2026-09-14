@@ -9,13 +9,21 @@ import { updateProfile } from "@/app/actions/profile";
 interface ProfileFormProps {
   initialName: string;
   initialDefaultWeightKg: number | null;
+  initialHeightCm: number | null;
 }
 
-export default function ProfileForm({ initialName, initialDefaultWeightKg }: ProfileFormProps) {
+export default function ProfileForm({
+  initialName,
+  initialDefaultWeightKg,
+  initialHeightCm,
+}: ProfileFormProps) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [defaultWeightKg, setDefaultWeightKg] = useState(
     initialDefaultWeightKg !== null ? String(initialDefaultWeightKg) : ""
+  );
+  const [heightCm, setHeightCm] = useState(
+    initialHeightCm !== null ? String(initialHeightCm) : ""
   );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -30,6 +38,7 @@ export default function ProfileForm({ initialName, initialDefaultWeightKg }: Pro
     const result = await updateProfile({
       name: name || undefined,
       defaultWeightKg: defaultWeightKg ? Number(defaultWeightKg) : undefined,
+      heightCm: heightCm ? Number(heightCm) : undefined,
     });
 
     setSubmitting(false);
@@ -63,6 +72,17 @@ export default function ProfileForm({ initialName, initialDefaultWeightKg }: Pro
           step="0.1"
           value={defaultWeightKg}
           onChange={(e) => setDefaultWeightKg(e.target.value)}
+          className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+        />
+      </div>
+      <div>
+        <label htmlFor="profile-height" className="block text-sm font-medium">身長 (cm)</label>
+        <input
+          id="profile-height"
+          type="number"
+          step="0.1"
+          value={heightCm}
+          onChange={(e) => setHeightCm(e.target.value)}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
         />
       </div>

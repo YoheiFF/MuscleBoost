@@ -27,13 +27,3 @@ export function calculateCalories(input: CalorieCalcInput): number {
   const raw = metValue * weightKg * hours * CALORIE_CORRECTION_FACTOR;
   return Math.round(raw * 10) / 10;
 }
-
-/**
- * セット数×1セットあたり想定秒数から運動時間(分)を逆算する任意の補助関数。
- * 必須機能ではない（FR-15）。UIの「時間を自動入力」ボタン用。
- */
-export function estimateDurationMinutes(setCount: number, secondsPerSet: number): number {
-  if (!Number.isFinite(setCount) || setCount <= 0) return 0;
-  if (!Number.isFinite(secondsPerSet) || secondsPerSet <= 0) return 0;
-  return Math.round(((setCount * secondsPerSet) / 60) * 10) / 10;
-}

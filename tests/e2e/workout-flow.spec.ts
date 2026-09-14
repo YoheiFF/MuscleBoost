@@ -63,7 +63,7 @@ test.describe("マシンマスタ", () => {
 });
 
 test.describe("トレーニング記録（最重要）", () => {
-  test("デフォルト体重設定→MET3.0マシンで記録→カロリーが期待値通り計算される", async ({ page }) => {
+  test("デフォルト体重設定→MET5.5マシンで記録→カロリーが期待値通り計算される", async ({ page }) => {
     const email = uniqueEmail("workout");
     await registerAndLogin(page, "記録ユーザー", email);
 
@@ -73,56 +73,74 @@ test.describe("トレーニング記録（最重要）", () => {
     await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
 
     await createSession(page);
-    await selectExerciseByName(page, "チェストプレス（軽度）");
+    await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
 
-    // MET3.0 × 70kg × 0.5h × 1.05 = 110.25 → 110.3kcal
+    // MET5.5 × 70kg × 0.5h × 1.05 = 202.125 → 202.1kcal
     // QA指摘対応: 「合計消費カロリー」表示とログ項目内表示の2箇所に同じテキストが出るため
     // strict mode違反になっていた。ここでは表示されていること自体の確認が目的のため .first() で一意化する。
-    await expect(page.getByText("110.3 kcal").first()).toBeVisible();
+    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
   });
 
-  test("体重を記録時に上書き→デフォルト体重ではなく上書き体重でカロリーが計算される", async ({ page }) => {
-    const email = uniqueEmail("override");
-    await registerAndLogin(page, "上書きユーザー", email);
+  test("プロフィールのデフォルト体重を変更すると、以降の記録に反映される", async ({ page }) => {
+    const email = uniqueEmail("weightchange");
+    await registerAndLogin(page, "体重変更ユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
 
     await createSession(page);
-    await selectExerciseByName(page, "チェストプレス（軽度）");
+    await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
-    await page.getByLabel("体重（kg・上書き、任意）").fill("80");
     await page.getByRole("button", { name: "記録を追加" }).click();
+    // MET5.5 × 70kg × 0.5h × 1.05 = 202.1kcal
+    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
 
-    // MET3.0 × 80kg × 0.5h × 1.05 = 126.0kcal
-    // QA指摘対応: 合計消費カロリー表示とログ項目内表示の2箇所にマッチするため .first() で一意化する。
-    await expect(page.getByText("126 kcal").first()).toBeVisible();
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("80");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    await createSession(page);
+    await selectExerciseByName(page, "チェストプレス");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByLabel("運動時間（分）").fill("30");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    // MET5.5 × 80kg × 0.5h × 1.05 = 231.0kcal
+    await expect(page.getByText("231 kcal").first()).toBeVisible();
   });
 
   test("セット数のみ変更（時間は同じ）→カロリー表示が変化しない", async ({ page }) => {
     const email = uniqueEmail("setonly");
     await registerAndLogin(page, "セット数比較ユーザー", email);
 
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
     await createSession(page);
-    await selectExerciseByName(page, "チェストプレス（軽度）");
+    await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
-    await page.getByLabel("体重（kg・上書き、任意）").fill("70");
     await page.getByRole("button", { name: "記録を追加" }).click();
-    await expect(page.getByText("110.3 kcal").first()).toBeVisible();
+    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
 
     await page.getByLabel("セット数").fill("5");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
-    await page.getByLabel("体重（kg・上書き、任意）").fill("70");
     await page.getByRole("button", { name: "記録を追加" }).click();
 
-    // 2件とも同じ運動時間・体重・MET値のため、カロリーは同一(110.3kcal)になるはず
-    await expect(page.getByText("110.3 kcal")).toHaveCount(2);
+    await expect(page.getByText("202.1 kcal")).toHaveCount(2);
   });
 
   test("デフォルト体重未設定・上書きも無しで記録保存→エラーが表示され保存されない", async ({ page }) => {
@@ -130,13 +148,13 @@ test.describe("トレーニング記録（最重要）", () => {
     await registerAndLogin(page, "体重未設定ユーザー", email);
 
     await createSession(page);
-    await selectExerciseByName(page, "チェストプレス（軽度）");
+    await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
 
-    await expect(page.getByText("体重を入力してください")).toBeVisible();
+    await expect(page.getByText("体重が未設定です")).toBeVisible();
     await expect(page.getByText("まだ記録がありません。")).toBeVisible();
   });
 
@@ -144,15 +162,19 @@ test.describe("トレーニング記録（最重要）", () => {
     const email = uniqueEmail("deletelog");
     await registerAndLogin(page, "削除確認ユーザー", email);
 
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
     await createSession(page);
-    await selectExerciseByName(page, "チェストプレス（軽度）");
+    await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
     await page.getByLabel("運動時間（分）").fill("30");
-    await page.getByLabel("体重（kg・上書き、任意）").fill("70");
     await page.getByRole("button", { name: "記録を追加" }).click();
     await expect(page.getByText("合計消費カロリー")).toBeVisible();
-    await expect(page.getByText("110.3 kcal").first()).toBeVisible();
+    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
 
     // QA指摘対応: name:"削除" は部分一致のため「セッションを削除」ボタンにもマッチしてしまう。
     // exact:true にすることでログ項目の「削除」ボタン（アクセシブルネームが完全に一致する方）のみに絞る。

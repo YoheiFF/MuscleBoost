@@ -14,6 +14,8 @@ model User {
   passwordHash    String
   name            String
   defaultWeightKg Float?
+  // 身長(cm)。保存・表示専用。カロリー計算には一切使用しない。
+  heightCm        Float?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -27,8 +29,6 @@ model Exercise {
   name              String
   // MuscleGroup: "CHEST" | "BACK" | "LEGS" | "SHOULDERS" | "ARMS" | "ABS" | "FULL_BODY" | "CARDIO"
   muscleGroup       String
-  // IntensityCategory: "LIGHT" | "MODERATE" | "VIGOROUS" | "HIGH_INTENSITY"
-  intensityCategory String
   metValue          Float
   description       String?
   isCustom          Boolean  @default(false)
@@ -67,7 +67,15 @@ model WorkoutLog {
   repsPerSet            Int
   durationMinutes       Float
   secondsPerSetOverride Int?
+  // 廃止済み・未使用列（2026-09-14-1651-profile-weight-height）。
+  // 開発/本番DB共有によるDDLリスクを避けるため列は残置し、Nullableのまま維持する。
+  // アプリケーションコードのいかなる箇所からも参照・書き込みしないこと。
+  // カロリー計算は常に User.defaultWeightKg のみを使用する。
   bodyWeightKgOverride  Float?
+  // 使用重量の記録（表示専用）。カロリー計算には一切使用しない。
+  // WeightUnit: "KG" | "LB"。weightValueとweightUnitは常にペアで存在する（片方のみの入力はZodバリデーションで拒否）。
+  weightValue           Float?
+  weightUnit            String?
   metValueSnapshot      Float
   caloriesBurned        Float
   createdAt             DateTime       @default(now())

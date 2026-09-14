@@ -4,11 +4,13 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/session-guard";
 import { calculateCalories } from "@/lib/calorie";
+import { calculateVolumeKg } from "@/lib/volume";
+import { resolveWeightKgForCalorie } from "@/lib/weight";
 import { getPeriodRange } from "@/lib/date";
 import { workoutSessionInputSchema, workoutLogInputSchema } from "@/lib/validation";
 import type {
   ActionResult, WorkoutSessionSummaryDTO, WorkoutSessionDetailDTO,
-  WorkoutLogDTO, DashboardStatsDTO,
+  WorkoutLogDTO, DashboardStatsDTO, WeightUnit,
 } from "@/types";
 
 export async function createWorkoutSession(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -44,15 +46,22 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
   }
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  const weightKg = data.bodyWeightKgOverride ?? dbUser?.defaultWeightKg ?? null;
-  if (weightKg === null) {
-    return { ok: false, error: "体重を入力してください（プロフィールでデフォルト体重を設定するか、この記録で体重を入力してください）" };
+  const weightResolution = resolveWeightKgForCalorie(dbUser?.defaultWeightKg);
+  if (!weightResolution.ok) {
+    return { ok: false, error: weightResolution.error };
   }
+  const weightKg = weightResolution.weightKg;
 
   const caloriesBurned = calculateCalories({
     metValue: exercise.metValue,
     weightKg,
     durationMinutes: data.durationMinutes,
+  });
+  const volumeKg = calculateVolumeKg({
+    setCount: data.setCount,
+    repsPerSet: data.repsPerSet,
+    weightValue: data.weightValue ?? null,
+    weightUnit: data.weightUnit ?? null,
   });
 
   const log = await prisma.workoutLog.create({
@@ -62,7 +71,8 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
       setCount: data.setCount,
       repsPerSet: data.repsPerSet,
       durationMinutes: data.durationMinutes,
-      bodyWeightKgOverride: data.bodyWeightKgOverride ?? null,
+      weightValue: data.weightValue ?? null,
+      weightUnit: data.weightUnit ?? null,
       metValueSnapshot: exercise.metValue,
       caloriesBurned,
     },
@@ -78,9 +88,11 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
         setCount: log.setCount,
         repsPerSet: log.repsPerSet,
         durationMinutes: log.durationMinutes,
-        bodyWeightKgOverride: log.bodyWeightKgOverride,
+        weightValue: log.weightValue,
+        weightUnit: log.weightUnit as WeightUnit | null,
         metValueSnapshot: log.metValueSnapshot,
         caloriesBurned: log.caloriesBurned,
+        volumeKg,
       },
     },
   };
@@ -105,10 +117,11 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
   const data = parsed.data;
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  const weightKg = data.bodyWeightKgOverride ?? dbUser?.defaultWeightKg ?? null;
-  if (weightKg === null) {
-    return { ok: false, error: "体重を入力してください" };
+  const weightResolution = resolveWeightKgForCalorie(dbUser?.defaultWeightKg);
+  if (!weightResolution.ok) {
+    return { ok: false, error: weightResolution.error };
   }
+  const weightKg = weightResolution.weightKg;
 
   // MET値はマスタの現在値を使う（マシン変更されていなければスナップショットは既存値のまま維持してもよいが、
   // ここでは編集時点の最新マスタ値で再計算し、metValueSnapshotも更新する: 編集操作は「今の情報で直す」行為とみなす）。
@@ -124,6 +137,12 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
     weightKg,
     durationMinutes: data.durationMinutes,
   });
+  const volumeKg = calculateVolumeKg({
+    setCount: data.setCount,
+    repsPerSet: data.repsPerSet,
+    weightValue: data.weightValue ?? null,
+    weightUnit: data.weightUnit ?? null,
+  });
 
   const updated = await prisma.workoutLog.update({
     where: { id: logId },
@@ -132,7 +151,8 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
       setCount: data.setCount,
       repsPerSet: data.repsPerSet,
       durationMinutes: data.durationMinutes,
-      bodyWeightKgOverride: data.bodyWeightKgOverride ?? null,
+      weightValue: data.weightValue ?? null,
+      weightUnit: data.weightUnit ?? null,
       metValueSnapshot: exercise.metValue,
       caloriesBurned,
     },
@@ -148,9 +168,11 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
         setCount: updated.setCount,
         repsPerSet: updated.repsPerSet,
         durationMinutes: updated.durationMinutes,
-        bodyWeightKgOverride: updated.bodyWeightKgOverride,
+        weightValue: updated.weightValue,
+        weightUnit: updated.weightUnit as WeightUnit | null,
         metValueSnapshot: updated.metValueSnapshot,
         caloriesBurned: updated.caloriesBurned,
+        volumeKg,
       },
     },
   };
@@ -210,9 +232,16 @@ export async function getWorkoutSession(id: string): Promise<WorkoutSessionDetai
     setCount: l.setCount,
     repsPerSet: l.repsPerSet,
     durationMinutes: l.durationMinutes,
-    bodyWeightKgOverride: l.bodyWeightKgOverride,
+    weightValue: l.weightValue,
+    weightUnit: l.weightUnit as WeightUnit | null,
     metValueSnapshot: l.metValueSnapshot,
     caloriesBurned: l.caloriesBurned,
+    volumeKg: calculateVolumeKg({
+      setCount: l.setCount,
+      repsPerSet: l.repsPerSet,
+      weightValue: l.weightValue,
+      weightUnit: l.weightUnit as WeightUnit | null,
+    }),
   }));
 
   return {

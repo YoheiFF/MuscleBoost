@@ -23,6 +23,7 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             npm install
+            npx prisma migrate deploy
             npm run build
             pm2 restart muscleboost 2>/dev/null || pm2 start ecosystem.config.js --env production
             pm2 save

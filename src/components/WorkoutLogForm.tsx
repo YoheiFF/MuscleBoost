@@ -4,9 +4,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { addWorkoutLog } from "@/app/actions/workouts";
-import { estimateDurationMinutes } from "@/lib/calorie";
 import ExercisePicker from "@/components/ExercisePicker";
-import type { ExerciseDTO, WorkoutLogDTO } from "@/types";
+import { WEIGHT_UNITS, WEIGHT_UNIT_LABELS, type WeightUnit, type ExerciseDTO, type WorkoutLogDTO } from "@/types";
 
 interface WorkoutLogFormProps {
   sessionId: string;
@@ -26,20 +25,11 @@ export default function WorkoutLogForm({
   const [setCount, setSetCount] = useState("");
   const [repsPerSet, setRepsPerSet] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
-  const [secondsPerSet, setSecondsPerSet] = useState("");
-  const [bodyWeightKgOverride, setBodyWeightKgOverride] = useState("");
+  const [weightValue, setWeightValue] = useState("");
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("KG");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
-
-  // 「セット数×秒数から時間を計算」補助ボタン。運動時間欄はユーザーが直接編集可能な値であり、
-  // 送信時は最終的にフォームに表示されている値を送る。
-  function handleEstimateDuration() {
-    const estimated = estimateDurationMinutes(Number(setCount), Number(secondsPerSet));
-    if (estimated > 0) {
-      setDurationMinutes(String(estimated));
-    }
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,7 +42,8 @@ export default function WorkoutLogForm({
       setCount: Number(setCount),
       repsPerSet: Number(repsPerSet),
       durationMinutes: Number(durationMinutes),
-      bodyWeightKgOverride: bodyWeightKgOverride ? Number(bodyWeightKgOverride) : undefined,
+      weightValue: weightValue ? Number(weightValue) : undefined,
+      weightUnit: weightValue ? weightUnit : undefined,
     });
 
     setSubmitting(false);
@@ -66,8 +57,8 @@ export default function WorkoutLogForm({
     setSetCount("");
     setRepsPerSet("");
     setDurationMinutes("");
-    setSecondsPerSet("");
-    setBodyWeightKgOverride("");
+    setWeightValue("");
+    setWeightUnit("KG");
 
     if (onCreated) {
       onCreated(result.data.log);
@@ -79,6 +70,15 @@ export default function WorkoutLogForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {defaultWeightKg === null && (
+        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          体重が未設定です。
+          <a href="/profile" className="ml-1 underline">
+            プロフィール
+          </a>
+          でデフォルト体重を設定してください。
+        </p>
+      )}
       <div>
         <label htmlFor="workout-log-exercise" className="block text-sm font-medium">マシン</label>
         <ExercisePicker
@@ -113,27 +113,6 @@ export default function WorkoutLogForm({
           {fieldErrors.repsPerSet && <p className="text-xs text-red-600">{fieldErrors.repsPerSet[0]}</p>}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
-        <div>
-          <label htmlFor="workout-log-seconds-per-set" className="block text-sm font-medium">
-            1セットあたり秒数（任意）
-          </label>
-          <input
-            id="workout-log-seconds-per-set"
-            type="number"
-            value={secondsPerSet}
-            onChange={(e) => setSecondsPerSet(e.target.value)}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={handleEstimateDuration}
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          セット数×秒数から時間を計算
-        </button>
-      </div>
       <div>
         <label htmlFor="workout-log-duration" className="block text-sm font-medium">運動時間（分）</label>
         <input
@@ -148,22 +127,35 @@ export default function WorkoutLogForm({
           <p className="text-xs text-red-600">{fieldErrors.durationMinutes[0]}</p>
         )}
       </div>
-      <div>
-        <label htmlFor="workout-log-weight-override" className="block text-sm font-medium">
-          体重（kg・上書き、任意）
-        </label>
-        <input
-          id="workout-log-weight-override"
-          type="number"
-          step="0.1"
-          value={bodyWeightKgOverride}
-          onChange={(e) => setBodyWeightKgOverride(e.target.value)}
-          placeholder={defaultWeightKg ? String(defaultWeightKg) : "未設定"}
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-        />
-        {fieldErrors.bodyWeightKgOverride && (
-          <p className="text-xs text-red-600">{fieldErrors.bodyWeightKgOverride[0]}</p>
-        )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
+        <div>
+          <label htmlFor="workout-log-weight-value" className="block text-sm font-medium">
+            重さ（任意）
+          </label>
+          <input
+            id="workout-log-weight-value"
+            type="number"
+            step="0.1"
+            value={weightValue}
+            onChange={(e) => setWeightValue(e.target.value)}
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          />
+          {fieldErrors.weightValue && <p className="text-xs text-red-600">{fieldErrors.weightValue[0]}</p>}
+        </div>
+        <div>
+          <label htmlFor="workout-log-weight-unit" className="block text-sm font-medium">単位</label>
+          <select
+            id="workout-log-weight-unit"
+            value={weightUnit}
+            onChange={(e) => setWeightUnit(e.target.value as WeightUnit)}
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          >
+            {WEIGHT_UNITS.map((u) => (
+              <option key={u} value={u}>{WEIGHT_UNIT_LABELS[u]}</option>
+            ))}
+          </select>
+          {fieldErrors.weightUnit && <p className="text-xs text-red-600">{fieldErrors.weightUnit[0]}</p>}
+        </div>
       </div>
       <button
         type="submit"

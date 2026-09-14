@@ -16,7 +16,11 @@ export default async function ProfilePage() {
     <div className="flex flex-col gap-8">
       <section>
         <h1 className="mb-4 text-xl font-bold">プロフィール</h1>
-        <ProfileForm initialName={dbUser?.name ?? ""} initialDefaultWeightKg={dbUser?.defaultWeightKg ?? null} />
+        <ProfileForm
+          initialName={dbUser?.name ?? ""}
+          initialDefaultWeightKg={dbUser?.defaultWeightKg ?? null}
+          initialHeightCm={dbUser?.heightCm ?? null}
+        />
       </section>
 
       <section>

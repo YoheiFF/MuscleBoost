@@ -7,10 +7,7 @@ import { createExercise } from "@/app/actions/exercises";
 import {
   MUSCLE_GROUPS,
   MUSCLE_GROUP_LABELS,
-  INTENSITY_CATEGORIES,
-  INTENSITY_LABELS,
   type MuscleGroup,
-  type IntensityCategory,
 } from "@/types";
 
 interface ExerciseFormProps {
@@ -21,7 +18,6 @@ export default function ExerciseForm({ onCreated }: ExerciseFormProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>("CHEST");
-  const [intensityCategory, setIntensityCategory] = useState<IntensityCategory>("MODERATE");
   const [metValue, setMetValue] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +33,6 @@ export default function ExerciseForm({ onCreated }: ExerciseFormProps) {
     const result = await createExercise({
       name,
       muscleGroup,
-      intensityCategory,
       metValue: Number(metValue),
       description: description || undefined,
     });
@@ -81,21 +76,6 @@ export default function ExerciseForm({ onCreated }: ExerciseFormProps) {
           {MUSCLE_GROUPS.map((g) => (
             <option key={g} value={g}>
               {MUSCLE_GROUP_LABELS[g]}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="exercise-intensity" className="block text-sm font-medium">強度</label>
-        <select
-          id="exercise-intensity"
-          value={intensityCategory}
-          onChange={(e) => setIntensityCategory(e.target.value as IntensityCategory)}
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-        >
-          {INTENSITY_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {INTENSITY_LABELS[c]}
             </option>
           ))}
         </select>

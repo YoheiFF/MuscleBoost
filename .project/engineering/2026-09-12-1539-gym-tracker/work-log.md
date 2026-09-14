@@ -246,3 +246,30 @@ phase: engineering
 - `npx tsc --noEmit`: エラー0件
 - `npm run build`: 成功
 - `npx playwright test`: 16件中16件pass（トップ画面の新テスト2件を含む）
+
+## ユーザー追加依頼への対応（2026-09-12）: さくらVPS本番環境への配置
+
+- 依頼内容: 既存のkindtech-harmony.com（コタカン・hp等が稼働中）と同じさくらVPSに、`muscleboost.kindtech-harmony.com` として配置してほしい。
+
+### 実施内容（既存のコタカン・zips・hp向け設定には一切変更を加えず、すべて新規追加のみ）
+1. `git init`し、GitHubリポジトリ `https://github.com/YoheiFF/MuscleBoost`（Public、ユーザー承認済み）を新規作成してプッシュ。
+2. `.github/workflows/deploy.yml` を新規作成: mainへのpushでGitHub Actionsが SSH 経由でVPSへ自動デプロイ。既存のkotakan/zipsパターン（`npm install --omit=dev`）とは異なり、Next.jsのビルドに`typescript`/`tailwindcss`等のdevDependenciesが必要なため、意図的に`npm install`（dev込み）+`npm run build`を実行する構成にした。
+3. `ecosystem.config.js` を新規作成: pm2プロセス名`muscleboost`、`next start -p 3002`で起動（ポート3000=kotakan, 3001=zipsと衝突しないよう3002を採用）。
+4. GitHub Actions用に**専用の新規SSH鍵ペア**を発行し、VPSの`~/.ssh/authorized_keys`に追記（ユーザーに確認・承認を得た上で実施。既存の鍵は変更なし）。秘密鍵は`MuscleBoost`リポジトリの GitHub Secrets（`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`）にのみ登録し、ローカルの一時コピーは作業後に削除。
+5. VPS上に `~/MuscleBoost` としてリポジトリをclone。`~/MuscleBoost/.env`に本番用`TURSO_DATABASE_URL`・`TURSO_AUTH_TOKEN`・新規生成した`AUTH_SECRET`・`AUTH_TRUST_HOST=true`（リバースプロキシ配下でのAuth.js動作に必要）を設定（`.env`はgitignore対象、リポジトリには含まれない）。
+6. `npm install && npm run build`後、`pm2 start ecosystem.config.js --env production && pm2 save`でプロセス登録。
+7. nginx設定 `/etc/nginx/sites-available/muscleboost` を新規作成（`muscleboost.kindtech-harmony.com` → `localhost:3002`のリバースプロキシ）。既存の`default`（kotakan用）・`homepage`（hp用）設定は無変更。
+8. DNS Aレコード（`muscleboost.kindtech-harmony.com` → `153.126.191.110`）はユーザー側で追加。反映確認後、`certbot --nginx`でLet's Encrypt証明書を取得しHTTPS化（2026-12-11失効、自動更新設定済み）。
+9. `gh workflow run deploy.yml`で自動デプロイを手動トリガーし、実際にGitHub Actions→SSH→pm2 restartの一連の流れが成功することを確認済み。
+
+### 動作確認結果
+- `https://muscleboost.kindtech-harmony.com/login` → 200
+- `https://muscleboost.kindtech-harmony.com/register` → 200
+- `https://muscleboost.kindtech-harmony.com/exercises`（未ログイン） → 307（`/login`へリダイレクト、認証ミドルウェア正常動作）
+- pm2上で`muscleboost`プロセスがonline、既存の`kotakan`・`zips`はuptimeに影響なし（無停止で追加できたことを確認）
+- GitHub Actions手動トリガーのデプロイが success で完了
+
+### 申し送り
+- 今後`main`にpushすれば自動でVPSに反映される。
+- VPS上の`.env`は手動管理（リポジトリ管理外）。Turso認証トークンのローテーション等が必要な場合はVPS側の`.env`を直接更新する必要がある。
+- `github-config.json`・`C:\project\CLAUDE.md`のデプロイ対応表にMuscleBoostのエントリを追記済み。
