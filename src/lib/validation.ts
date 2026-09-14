@@ -30,7 +30,11 @@ export const workoutLogInputSchema = z
     exerciseId: z.string().min(1),
     setCount: z.number().int().positive("セット数は1以上の整数で入力してください").max(50),
     repsPerSet: z.number().int().positive("レップ数は1以上の整数で入力してください").max(200),
-    durationMinutes: z.number().positive("運動時間は0より大きい値を入力してください").max(600),
+    durationMinutes: z
+      .number()
+      .positive("運動時間は0より大きい値を入力してください")
+      .max(600)
+      .optional(),
     weightValue: z
       .number()
       .positive("重さは0より大きい値を入力してください")

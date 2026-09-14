@@ -10,6 +10,16 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   ARMS: "腕", ABS: "腹", FULL_BODY: "全身", CARDIO: "有酸素",
 };
 
+/**
+ * muscleGroupが有酸素系（CARDIO）かどうかを判定する。
+ * 有酸素/筋トレの判定はこの関数（＝muscleGroup === "CARDIO"）に一元化し、
+ * UI（運動時間欄の要否切替）・Server Action（運動時間の必須チェック/推定切替）・
+ * 記録表示（推定値ラベルの要否）のすべてが本関数を参照する（判定ロジックの二重実装を避ける）。
+ */
+export function isCardioMuscleGroup(muscleGroup: MuscleGroup): boolean {
+  return muscleGroup === "CARDIO";
+}
+
 export const WEIGHT_UNITS = ["KG", "LB"] as const;
 export type WeightUnit = (typeof WEIGHT_UNITS)[number];
 
@@ -31,6 +41,12 @@ export interface WorkoutLogDTO {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  /** 記録した種目のmuscleGroup。運動時間(durationMinutes)が「ユーザー入力値」か
+   *  「サーバー推定値」かを表示側で判別するために使う
+   *  （isCardioMuscleGroup(muscleGroup) === falseの記録は、durationMinutesが常に
+   *  estimateDurationMinutesForStrength()によるサーバー推定値であることを意味する）。
+   *  区別用の新規DB列は追加せず、Exercise.muscleGroupをServer Actionで都度参照して詰めている。 */
+  muscleGroup: MuscleGroup;
   setCount: number;
   repsPerSet: number;
   durationMinutes: number;

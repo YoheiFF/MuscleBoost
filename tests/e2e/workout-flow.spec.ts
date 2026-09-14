@@ -33,6 +33,21 @@ async function selectExerciseByName(page: Page, namePart: string): Promise<void>
   await select.selectOption(optionValue);
 }
 
+/**
+ * 記録編集モーダル内のマシン選択欄（追加フォームと同じ aria-label="マシン" を持つが、
+ * 編集モーダルには <label htmlFor> の関連付けが無いため、モーダルのコンテナ内に
+ * スコープしてから選択する必要がある）で、表示名の一部が一致する最初のオプションを選択する。
+ */
+async function selectEditExerciseByName(page: Page, namePart: string): Promise<void> {
+  const modal = page.locator("div", { hasText: "記録を編集" }).last();
+  const select = modal.getByLabel("マシン");
+  const optionValue = await select.locator("option", { hasText: namePart }).first().getAttribute("value");
+  if (!optionValue) {
+    throw new Error(`マシン選択肢が見つかりません: ${namePart}`);
+  }
+  await select.selectOption(optionValue);
+}
+
 test.describe("マシンマスタ", () => {
   test("シード投入後、部位フィルタ「脚」でレッグプレス等のみ表示される", async ({ page }) => {
     const email = uniqueEmail("exlist");
@@ -76,13 +91,14 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
+    // 筋トレ系（非CARDIO）は運動時間欄が表示されないため入力しない。
     await page.getByRole("button", { name: "記録を追加" }).click();
 
-    // MET5.5 × 70kg × 0.5h × 1.05 = 202.125 → 202.1kcal
+    // 推定運動時間 = (3*10*3 + 2*60)/60 = 3.5分
+    // MET5.5 × 70kg × (3.5/60)h × 1.05 = 23.58125 → 23.6kcal
     // QA指摘対応: 「合計消費カロリー」表示とログ項目内表示の2箇所に同じテキストが出るため
     // strict mode違反になっていた。ここでは表示されていること自体の確認が目的のため .first() で一意化する。
-    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
   });
 
   test("プロフィールのデフォルト体重を変更すると、以降の記録に反映される", async ({ page }) => {
@@ -98,10 +114,9 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
-    // MET5.5 × 70kg × 0.5h × 1.05 = 202.1kcal
-    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
+    // 推定運動時間3.5分。MET5.5 × 70kg × (3.5/60)h × 1.05 = 23.6kcal
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
 
     await page.goto("/profile");
     await page.getByLabel("デフォルト体重 (kg)").fill("80");
@@ -112,15 +127,104 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
-    // MET5.5 × 80kg × 0.5h × 1.05 = 231.0kcal
-    await expect(page.getByText("231 kcal").first()).toBeVisible();
+    // MET5.5 × 80kg × (3.5/60)h × 1.05 = 27kcal
+    await expect(page.getByText("27 kcal").first()).toBeVisible();
   });
 
-  test("セット数のみ変更（時間は同じ）→カロリー表示が変化しない", async ({ page }) => {
+  test("有酸素系: セット数のみ変更（運動時間は同じ入力値）→カロリー表示が変化しない", async ({ page }) => {
     const email = uniqueEmail("setonly");
     await registerAndLogin(page, "セット数比較ユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    await createSession(page);
+    // 有酸素系は運動時間がセット数に依存しない（ユーザー入力値のまま）ことを確認するため、
+    // CARDIOマシン（エアロバイク 30〜50W、MET3.5）を使う。
+    await selectExerciseByName(page, "30〜50W");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByLabel("運動時間（分）").fill("30");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    // MET3.5 × 70kg × 0.5h × 1.05 = 128.625 → 128.6kcal
+    await expect(page.getByText("128.6 kcal").first()).toBeVisible();
+
+    // QA指摘対応: 1件目の記録追加成功後、WorkoutLogFormは全フィールド（マシン選択含む）を
+    // リセットする既存仕様があるため、2件目を送信する前にマシンを再選択する必要がある。
+    await selectExerciseByName(page, "30〜50W");
+    await page.getByLabel("セット数").fill("5");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByLabel("運動時間（分）").fill("30");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+
+    await expect(page.getByText("128.6 kcal")).toHaveCount(2);
+  });
+
+  test("有酸素系マシンで運動時間を未入力のまま保存しようとするとエラーになり保存されない", async ({ page }) => {
+    const email = uniqueEmail("cardiorequired");
+    await registerAndLogin(page, "有酸素必須確認ユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    await createSession(page);
+    await selectExerciseByName(page, "30〜50W");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    // 運動時間（分）は意図的に未入力のまま送信する
+    await page.getByRole("button", { name: "記録を追加" }).click();
+
+    await expect(page.getByText("有酸素系のマシンでは運動時間の入力が必須です")).toBeVisible();
+    await expect(page.getByText("まだ記録がありません。")).toBeVisible();
+  });
+
+  test("筋トレ系マシンを選択すると運動時間欄が表示されない", async ({ page }) => {
+    const email = uniqueEmail("nofield");
+    await registerAndLogin(page, "欄非表示確認ユーザー", email);
+
+    await createSession(page);
+    await selectExerciseByName(page, "チェストプレス");
+    await expect(page.getByLabel("運動時間（分）")).toHaveCount(0);
+  });
+
+  test("記録一覧: 筋トレ系の運動時間には「（推定値）」が付き、有酸素系には付かない（AC-4）", async ({ page }) => {
+    const email = uniqueEmail("estimatelabel");
+    await registerAndLogin(page, "推定値表示確認ユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    await createSession(page);
+
+    // 筋トレ系（非CARDIO）: チェストプレス 3セット×10レップ → 推定運動時間3.5分。
+    // durationMinutesはサーバー推定値のため「（推定値）」ラベルが付与される。
+    await selectExerciseByName(page, "チェストプレス");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    await expect(page.getByText("3セット × 10レップ / 3.5分（推定値）")).toBeVisible();
+
+    // 有酸素系（CARDIO）: エアロバイク(30〜50W)・運動時間30分はユーザー入力値のため
+    // 「（推定値）」ラベルは付与されない。
+    await selectExerciseByName(page, "30〜50W");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByLabel("運動時間（分）").fill("30");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    await expect(page.getByText("3セット × 10レップ / 30分", { exact: true })).toBeVisible();
+    await expect(page.getByText("30分（推定値）")).toHaveCount(0);
+  });
+
+  test("編集モーダル: 種目をCARDIO⇔非CARDIOに変更すると運動時間欄の表示が切り替わる", async ({ page }) => {
+    const email = uniqueEmail("edittoggle");
+    await registerAndLogin(page, "編集切替確認ユーザー", email);
 
     await page.goto("/profile");
     await page.getByLabel("デフォルト体重 (kg)").fill("70");
@@ -131,16 +235,22 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
-    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
 
-    await page.getByLabel("セット数").fill("5");
-    await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
-    await page.getByRole("button", { name: "記録を追加" }).click();
+    await page.getByRole("button", { name: "編集", exact: true }).click();
+    await expect(page.getByText("記録を編集")).toBeVisible();
 
-    await expect(page.getByText("202.1 kcal")).toHaveCount(2);
+    // 編集対象は筋トレ系（チェストプレス）のため、運動時間欄は表示されない。
+    await expect(page.getByPlaceholder("運動時間（分）")).toHaveCount(0);
+
+    // 種目を有酸素系（エアロバイク 30〜50W）に変更すると、運動時間欄が表示される。
+    await selectEditExerciseByName(page, "30〜50W");
+    await expect(page.getByPlaceholder("運動時間（分）")).toBeVisible();
+
+    // 再び筋トレ系（チェストプレス）に戻すと、運動時間欄は非表示に戻る。
+    await selectEditExerciseByName(page, "チェストプレス");
+    await expect(page.getByPlaceholder("運動時間（分）")).toHaveCount(0);
   });
 
   test("デフォルト体重未設定・上書きも無しで記録保存→エラーが表示され保存されない", async ({ page }) => {
@@ -151,7 +261,6 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
 
     await expect(page.getByText("体重が未設定です")).toBeVisible();
@@ -171,10 +280,9 @@ test.describe("トレーニング記録（最重要）", () => {
     await selectExerciseByName(page, "チェストプレス");
     await page.getByLabel("セット数").fill("3");
     await page.getByLabel("レップ数").fill("10");
-    await page.getByLabel("運動時間（分）").fill("30");
     await page.getByRole("button", { name: "記録を追加" }).click();
     await expect(page.getByText("合計消費カロリー")).toBeVisible();
-    await expect(page.getByText("202.1 kcal").first()).toBeVisible();
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
 
     // QA指摘対応: name:"削除" は部分一致のため「セッションを削除」ボタンにもマッチしてしまう。
     // exact:true にすることでログ項目の「削除」ボタン（アクセシブルネームが完全に一致する方）のみに絞る。

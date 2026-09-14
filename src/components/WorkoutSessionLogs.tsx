@@ -8,7 +8,7 @@ import { updateWorkoutLog, deleteWorkoutLog } from "@/app/actions/workouts";
 import WorkoutLogForm from "@/components/WorkoutLogForm";
 import WorkoutLogItem from "@/components/WorkoutLogItem";
 import ExercisePicker from "@/components/ExercisePicker";
-import type { ExerciseDTO, WorkoutLogDTO } from "@/types";
+import { isCardioMuscleGroup, type ExerciseDTO, type WorkoutLogDTO } from "@/types";
 
 interface WorkoutSessionLogsProps {
   sessionId: string;
@@ -30,7 +30,11 @@ export default function WorkoutSessionLogs({
   const [editRepsPerSet, setEditRepsPerSet] = useState("");
   const [editDurationMinutes, setEditDurationMinutes] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string[]>>({});
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const editExercise = exercises.find((ex) => ex.id === editExerciseId) ?? null;
+  const editRequiresDuration = editExercise !== null && isCardioMuscleGroup(editExercise.muscleGroup);
 
   const totalCalories = Math.round(logs.reduce((sum, l) => sum + l.caloriesBurned, 0) * 10) / 10;
   const totalVolumeKg = Math.round(logs.reduce((sum, l) => sum + l.volumeKg, 0) * 10) / 10;
@@ -42,21 +46,24 @@ export default function WorkoutSessionLogs({
     setEditRepsPerSet(String(log.repsPerSet));
     setEditDurationMinutes(String(log.durationMinutes));
     setEditError(null);
+    setEditFieldErrors({});
   }
 
   async function handleUpdate() {
     if (!editingLog) return;
     setEditSubmitting(true);
     setEditError(null);
+    setEditFieldErrors({});
     const result = await updateWorkoutLog(editingLog.id, {
       exerciseId: editExerciseId,
       setCount: Number(editSetCount),
       repsPerSet: Number(editRepsPerSet),
-      durationMinutes: Number(editDurationMinutes),
+      durationMinutes: editRequiresDuration && editDurationMinutes !== "" ? Number(editDurationMinutes) : undefined,
     });
     setEditSubmitting(false);
     if (!result.ok) {
       setEditError(result.error);
+      setEditFieldErrors(result.fieldErrors ?? {});
       return;
     }
     setLogs((prev) => prev.map((l) => (l.id === result.data.log.id ? result.data.log : l)));
@@ -136,14 +143,21 @@ export default function WorkoutSessionLogs({
                 placeholder="レップ数"
                 className="rounded border border-gray-300 px-3 py-2"
               />
-              <input
-                type="number"
-                step="0.1"
-                value={editDurationMinutes}
-                onChange={(e) => setEditDurationMinutes(e.target.value)}
-                placeholder="運動時間（分）"
-                className="rounded border border-gray-300 px-3 py-2"
-              />
+              {editRequiresDuration && (
+                <div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editDurationMinutes}
+                    onChange={(e) => setEditDurationMinutes(e.target.value)}
+                    placeholder="運動時間（分）"
+                    className="w-full rounded border border-gray-300 px-3 py-2"
+                  />
+                  {editFieldErrors.durationMinutes && (
+                    <p className="text-xs text-red-600">{editFieldErrors.durationMinutes[0]}</p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button

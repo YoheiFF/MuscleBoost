@@ -5,7 +5,10 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { addWorkoutLog } from "@/app/actions/workouts";
 import ExercisePicker from "@/components/ExercisePicker";
-import { WEIGHT_UNITS, WEIGHT_UNIT_LABELS, type WeightUnit, type ExerciseDTO, type WorkoutLogDTO } from "@/types";
+import {
+  WEIGHT_UNITS, WEIGHT_UNIT_LABELS, isCardioMuscleGroup,
+  type WeightUnit, type ExerciseDTO, type WorkoutLogDTO,
+} from "@/types";
 
 interface WorkoutLogFormProps {
   sessionId: string;
@@ -31,6 +34,9 @@ export default function WorkoutLogForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const selectedExercise = exercises.find((ex) => ex.id === exerciseId) ?? null;
+  const requiresDuration = selectedExercise !== null && isCardioMuscleGroup(selectedExercise.muscleGroup);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -41,7 +47,7 @@ export default function WorkoutLogForm({
       exerciseId,
       setCount: Number(setCount),
       repsPerSet: Number(repsPerSet),
-      durationMinutes: Number(durationMinutes),
+      durationMinutes: requiresDuration && durationMinutes !== "" ? Number(durationMinutes) : undefined,
       weightValue: weightValue ? Number(weightValue) : undefined,
       weightUnit: weightValue ? weightUnit : undefined,
     });
@@ -113,20 +119,24 @@ export default function WorkoutLogForm({
           {fieldErrors.repsPerSet && <p className="text-xs text-red-600">{fieldErrors.repsPerSet[0]}</p>}
         </div>
       </div>
-      <div>
-        <label htmlFor="workout-log-duration" className="block text-sm font-medium">運動時間（分）</label>
-        <input
-          id="workout-log-duration"
-          type="number"
-          step="0.1"
-          value={durationMinutes}
-          onChange={(e) => setDurationMinutes(e.target.value)}
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
-        />
-        {fieldErrors.durationMinutes && (
-          <p className="text-xs text-red-600">{fieldErrors.durationMinutes[0]}</p>
-        )}
-      </div>
+      {requiresDuration && (
+        <div>
+          <label htmlFor="workout-log-duration" className="block text-sm font-medium">
+            運動時間（分）<span className="text-red-600">*</span>
+          </label>
+          <input
+            id="workout-log-duration"
+            type="number"
+            step="0.1"
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          />
+          {fieldErrors.durationMinutes && (
+            <p className="text-xs text-red-600">{fieldErrors.durationMinutes[0]}</p>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
         <div>
           <label htmlFor="workout-log-weight-value" className="block text-sm font-medium">

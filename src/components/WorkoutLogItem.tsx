@@ -1,5 +1,5 @@
 // src/components/WorkoutLogItem.tsx
-import { WEIGHT_UNIT_LABELS, type WorkoutLogDTO } from "@/types";
+import { WEIGHT_UNIT_LABELS, isCardioMuscleGroup, type WorkoutLogDTO } from "@/types";
 
 interface WorkoutLogItemProps {
   log: WorkoutLogDTO;
@@ -8,12 +8,15 @@ interface WorkoutLogItemProps {
 }
 
 export default function WorkoutLogItem({ log, onEdit, onDelete }: WorkoutLogItemProps) {
+  // 非CARDIO種目のdurationMinutesは常にサーバー推定値（src/app/actions/workouts.ts参照）。
+  const isEstimatedDuration = !isCardioMuscleGroup(log.muscleGroup);
   return (
     <li className="flex items-center justify-between rounded border border-gray-200 bg-white p-3">
       <div>
         <p className="font-medium">{log.exerciseName}</p>
         <p className="text-sm text-gray-500">
           {log.setCount}セット × {log.repsPerSet}レップ / {log.durationMinutes}分
+          {isEstimatedDuration ? "（推定値）" : ""}
           {log.weightValue !== null && log.weightUnit ? ` / 重さ${log.weightValue}${WEIGHT_UNIT_LABELS[log.weightUnit]}` : ""}
         </p>
         <p className="text-sm font-semibold text-gray-900">{log.caloriesBurned} kcal</p>

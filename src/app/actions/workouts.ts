@@ -3,14 +3,15 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/session-guard";
-import { calculateCalories } from "@/lib/calorie";
+import { calculateCalories, estimateDurationMinutesForStrength } from "@/lib/calorie";
 import { calculateVolumeKg } from "@/lib/volume";
 import { resolveWeightKgForCalorie } from "@/lib/weight";
 import { getPeriodRange } from "@/lib/date";
 import { workoutSessionInputSchema, workoutLogInputSchema } from "@/lib/validation";
+import { isCardioMuscleGroup } from "@/types";
 import type {
   ActionResult, WorkoutSessionSummaryDTO, WorkoutSessionDetailDTO,
-  WorkoutLogDTO, DashboardStatsDTO, WeightUnit,
+  WorkoutLogDTO, DashboardStatsDTO, WeightUnit, MuscleGroup,
 } from "@/types";
 
 export async function createWorkoutSession(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -52,10 +53,28 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
   }
   const weightKg = weightResolution.weightKg;
 
+  const muscleGroup = exercise.muscleGroup as MuscleGroup;
+  let durationMinutes: number;
+  if (isCardioMuscleGroup(muscleGroup)) {
+    // 有酸素系: 運動時間は引き続き必須。Zodではoptional化しているため、ここで明示的に検証する。
+    if (data.durationMinutes === undefined) {
+      return {
+        ok: false,
+        error: "入力内容を確認してください",
+        fieldErrors: { durationMinutes: ["有酸素系のマシンでは運動時間の入力が必須です"] },
+      };
+    }
+    durationMinutes = data.durationMinutes;
+  } else {
+    // 筋トレ系: クライアントからdurationMinutesが送られてきても無視し、
+    // 常にサーバー側でセット数・レップ数から推定する（改ざん・実装漏れへの防御）。
+    durationMinutes = estimateDurationMinutesForStrength(data.setCount, data.repsPerSet);
+  }
+
   const caloriesBurned = calculateCalories({
     metValue: exercise.metValue,
     weightKg,
-    durationMinutes: data.durationMinutes,
+    durationMinutes,
   });
   const volumeKg = calculateVolumeKg({
     setCount: data.setCount,
@@ -70,7 +89,7 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
       exerciseId: data.exerciseId,
       setCount: data.setCount,
       repsPerSet: data.repsPerSet,
-      durationMinutes: data.durationMinutes,
+      durationMinutes,
       weightValue: data.weightValue ?? null,
       weightUnit: data.weightUnit ?? null,
       metValueSnapshot: exercise.metValue,
@@ -85,6 +104,7 @@ export async function addWorkoutLog(sessionId: string, input: unknown): Promise<
         id: log.id,
         exerciseId: log.exerciseId,
         exerciseName: exercise.name,
+        muscleGroup,
         setCount: log.setCount,
         repsPerSet: log.repsPerSet,
         durationMinutes: log.durationMinutes,
@@ -132,10 +152,25 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
     return { ok: false, error: "対象のマシンが見つかりません" };
   }
 
+  const muscleGroup = exercise.muscleGroup as MuscleGroup;
+  let durationMinutes: number;
+  if (isCardioMuscleGroup(muscleGroup)) {
+    if (data.durationMinutes === undefined) {
+      return {
+        ok: false,
+        error: "入力内容を確認してください",
+        fieldErrors: { durationMinutes: ["有酸素系のマシンでは運動時間の入力が必須です"] },
+      };
+    }
+    durationMinutes = data.durationMinutes;
+  } else {
+    durationMinutes = estimateDurationMinutesForStrength(data.setCount, data.repsPerSet);
+  }
+
   const caloriesBurned = calculateCalories({
     metValue: exercise.metValue,
     weightKg,
-    durationMinutes: data.durationMinutes,
+    durationMinutes,
   });
   const volumeKg = calculateVolumeKg({
     setCount: data.setCount,
@@ -150,7 +185,7 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
       exerciseId: data.exerciseId,
       setCount: data.setCount,
       repsPerSet: data.repsPerSet,
-      durationMinutes: data.durationMinutes,
+      durationMinutes,
       weightValue: data.weightValue ?? null,
       weightUnit: data.weightUnit ?? null,
       metValueSnapshot: exercise.metValue,
@@ -165,6 +200,7 @@ export async function updateWorkoutLog(logId: string, input: unknown): Promise<A
         id: updated.id,
         exerciseId: updated.exerciseId,
         exerciseName: exercise.name,
+        muscleGroup,
         setCount: updated.setCount,
         repsPerSet: updated.repsPerSet,
         durationMinutes: updated.durationMinutes,
@@ -229,6 +265,7 @@ export async function getWorkoutSession(id: string): Promise<WorkoutSessionDetai
     id: l.id,
     exerciseId: l.exerciseId,
     exerciseName: l.exercise.name,
+    muscleGroup: l.exercise.muscleGroup as MuscleGroup,
     setCount: l.setCount,
     repsPerSet: l.repsPerSet,
     durationMinutes: l.durationMinutes,

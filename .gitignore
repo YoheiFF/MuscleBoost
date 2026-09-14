@@ -8,3 +8,4 @@ prisma/dev.db-journal
 *.tsbuildinfo
 test-results
 playwright-report
+dev-local.log
