@@ -38,6 +38,10 @@ export default function NewWorkoutSessionPage() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="mb-6 text-xl font-bold">新規セッション</h1>
+      <p className="mb-4 text-sm text-gray-500">
+        指定した日にすでに記録がある場合は、新しいセッションを作らず、その日の記録に追加します
+        （その場合、ここで入力したメモは反映されません）。
+      </p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div>

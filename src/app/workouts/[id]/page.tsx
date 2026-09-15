@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserOrThrow } from "@/lib/session-guard";
 import CalorieDisclaimer from "@/components/CalorieDisclaimer";
 import WorkoutSessionLogs from "@/components/WorkoutSessionLogs";
+import DeleteSessionButton from "@/components/DeleteSessionButton";
 
 interface WorkoutSessionPageProps {
   params: Promise<{ id: string }>;
@@ -32,9 +33,9 @@ export default async function WorkoutSessionPage({ params }: WorkoutSessionPageP
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">{new Date(session.performedAt).toLocaleString("ja-JP")}</h1>
         <form action={handleDeleteSession}>
-          <button type="submit" className="text-sm text-red-600 hover:underline">
-            セッションを削除
-          </button>
+          <DeleteSessionButton
+            confirmMessage={`この日の記録を${session.logCount}件すべて削除します。よろしいですか？`}
+          />
         </form>
       </div>
       {session.memo && <p className="text-sm text-gray-500">{session.memo}</p>}

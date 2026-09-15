@@ -23,7 +23,6 @@ export default function Header({ userName }: HeaderProps) {
             <Link href="/workouts">記録</Link>
             <Link href="/exercises">マシン</Link>
             <Link href="/profile">プロフィール</Link>
-            <span className="text-gray-500">{userName} さん</span>
             <form action={handleLogout}>
               <button type="submit" className="text-blue-600 hover:underline">
                 ログアウト

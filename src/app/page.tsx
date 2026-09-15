@@ -1,13 +1,19 @@
-// src/app/page.tsx（トップ画面: 記録する／実績を確認する の選択メニュー）
+// src/app/page.tsx（ログイン後の初期画面: 記録する／実績を確認する の選択メニュー）
 import Link from "next/link";
+import { getCurrentUserOrThrow } from "@/lib/session-guard";
+import { prisma } from "@/lib/prisma";
 
-export default function TopPage() {
+export default async function TopPage() {
+  const user = await getCurrentUserOrThrow();
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+  const greeting = dbUser?.name ? `${dbUser.name}さん、今日は何をしますか？` : "今日は何をしますか？";
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">今日は何をしますか？</h1>
+      <h1 className="text-xl font-bold">{greeting}</h1>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
-          href="/workouts/new"
+          href="/workouts/today"
           className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-6 text-center hover:bg-gray-50"
         >
           <span className="text-3xl">💪</span>

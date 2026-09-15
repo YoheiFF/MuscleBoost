@@ -15,7 +15,7 @@ test.describe("認証", () => {
     await page.getByRole("button", { name: "登録する" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "今日は何をしますか？" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "テストユーザーさん、今日は何をしますか？" })).toBeVisible();
   });
 
   test("ログアウト後、再ログインできる", async ({ page }) => {

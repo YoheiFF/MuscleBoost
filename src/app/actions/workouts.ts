@@ -6,7 +6,7 @@ import { getCurrentUserOrThrow } from "@/lib/session-guard";
 import { calculateCalories, estimateDurationMinutesForStrength } from "@/lib/calorie";
 import { calculateVolumeKg } from "@/lib/volume";
 import { resolveWeightKgForCalorie } from "@/lib/weight";
-import { getPeriodRange } from "@/lib/date";
+import { getPeriodRange, getJstDayRangeUtc } from "@/lib/date";
 import { workoutSessionInputSchema, workoutLogInputSchema } from "@/lib/validation";
 import { isCardioMuscleGroup } from "@/types";
 import type {
@@ -14,16 +14,57 @@ import type {
   WorkoutLogDTO, DashboardStatsDTO, WeightUnit, MuscleGroup,
 } from "@/types";
 
-export async function createWorkoutSession(input: unknown): Promise<ActionResult<{ id: string }>> {
+/**
+ * find-or-createの本体。userIdの「performedAtが属するJST暦日」の既存WorkoutSessionを検索し、
+ * あれば再利用し（reused: true）、無ければ新規作成する（reused: false）。
+ * createWorkoutSessionとgetOrCreateTodaysWorkoutSessionの両方から呼ばれる非公開ヘルパー。
+ * 同一暦日に複数件該当する場合（本機能導入前に作られた既存データ等）は、
+ * createdAt昇順で最も早く作られたものを正とする。
+ */
+async function resolveOrCreateSessionForDay(
+  userId: string,
+  performedAt: Date,
+  memo: string | undefined
+): Promise<{ id: string; reused: boolean }> {
+  const { dayStartUtc, dayEndUtc } = getJstDayRangeUtc(performedAt);
+  const existing = await prisma.workoutSession.findFirst({
+    where: {
+      userId,
+      performedAt: { gte: dayStartUtc, lt: dayEndUtc },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) {
+    return { id: existing.id, reused: true };
+  }
+  const created = await prisma.workoutSession.create({
+    data: { userId, performedAt, memo },
+  });
+  return { id: created.id, reused: false };
+}
+
+export async function createWorkoutSession(
+  input: unknown
+): Promise<ActionResult<{ id: string; reused: boolean }>> {
   const user = await getCurrentUserOrThrow();
   const parsed = workoutSessionInputSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "入力内容を確認してください", fieldErrors: parsed.error.flatten().fieldErrors };
   }
-  const session = await prisma.workoutSession.create({
-    data: { userId: user.id, performedAt: parsed.data.performedAt, memo: parsed.data.memo },
-  });
-  return { ok: true, data: { id: session.id } };
+  const result = await resolveOrCreateSessionForDay(user.id, parsed.data.performedAt, parsed.data.memo);
+  return { ok: true, data: result };
+}
+
+/**
+ * 「今日（JST基準）」を対象にfind-or-createする。入力なし。
+ * ホーム画面「①今日の記録をする」→ /workouts/today から呼ばれる。
+ */
+export async function getOrCreateTodaysWorkoutSession(): Promise<
+  ActionResult<{ id: string; reused: boolean }>
+> {
+  const user = await getCurrentUserOrThrow();
+  const result = await resolveOrCreateSessionForDay(user.id, new Date(), undefined);
+  return { ok: true, data: result };
 }
 
 /** ワークアウトログ追加。カロリーはここで計算し保存する（アプリ内で唯一のカロリー計算箇所）。 */

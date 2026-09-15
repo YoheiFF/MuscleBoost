@@ -310,6 +310,70 @@ test.describe("トレーニング記録（最重要）", () => {
 
     await contextB.close();
   });
+
+  test("同じ日に複数回セッションを開始しても、同一セッションに記録が合流する", async ({ page }) => {
+    const email = uniqueEmail("samedaycontinuity");
+    await registerAndLogin(page, "同日継続確認ユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    // 1回目: /workouts/today 経由でセッションを開始し、1件記録する
+    await page.goto("/workouts/today");
+    await page.waitForURL((url) => /\/workouts\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new") && !url.pathname.endsWith("/today"));
+    const firstSessionUrl = page.url();
+    await selectExerciseByName(page, "チェストプレス");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
+
+    // 2回目: 別画面（プロフィール）に一度移動してから、再び /workouts/today 経由で記録を始める
+    await page.goto("/profile");
+    await page.goto("/workouts/today");
+    await page.waitForURL((url) => /\/workouts\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new") && !url.pathname.endsWith("/today"));
+
+    // 同一セッションに合流しているため、1回目に追加した記録がそのまま見えている
+    await expect(page).toHaveURL(firstSessionUrl);
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
+
+    // 2件目を追加すると、同一セッション内に2件の記録が積み上がる（合計 47.2kcal）
+    await selectExerciseByName(page, "チェストプレス");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    await expect(page.getByText("47.2 kcal")).toBeVisible(); // 合計消費カロリー表示
+  });
+
+  test("セッション削除時に確認ダイアログが表示され、キャンセルすると削除されない", async ({ page }) => {
+    const email = uniqueEmail("deleteconfirm");
+    await registerAndLogin(page, "削除確認ダイアログユーザー", email);
+
+    await page.goto("/profile");
+    await page.getByLabel("デフォルト体重 (kg)").fill("70");
+    await page.getByRole("button", { name: "更新する" }).click();
+    await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
+
+    await createSession(page);
+    await selectExerciseByName(page, "チェストプレス");
+    await page.getByLabel("セット数").fill("3");
+    await page.getByLabel("レップ数").fill("10");
+    await page.getByRole("button", { name: "記録を追加" }).click();
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
+
+    const sessionUrl = page.url();
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.getByRole("button", { name: "セッションを削除" }).click();
+    // キャンセルしたのでページ遷移せず、記録も残ったまま
+    await expect(page).toHaveURL(sessionUrl);
+    await expect(page.getByText("23.6 kcal").first()).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "セッションを削除" }).click();
+    await expect(page).toHaveURL("/workouts");
+  });
 });
 
 test.describe("トップ画面・実績", () => {
