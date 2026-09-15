@@ -8,6 +8,7 @@ import {
   JST_OFFSET_MS,
   getJstDateKey,
   addDays,
+  getJstDayRangeUtc,
   getJstWeekRangeUtc,
   getJstMonthRangeUtc,
 } from "@/lib/date";
@@ -45,8 +46,6 @@ export interface AchievementSessionInput {
   logs: AchievementLogInput[];
 }
 
-/** ヒートマップの表示日数（53週×7日=371日、GitHub風の1年表示用ウィンドウ） */
-export const HEATMAP_WINDOW_DAYS = 371;
 /** ヒートマップの色レベル境界（件数）。この件数以上でlevel2、level3になる */
 export const HEATMAP_LEVEL_2_MIN_LOG_COUNT = 3;
 export const HEATMAP_LEVEL_3_MIN_LOG_COUNT = 6;
@@ -80,8 +79,48 @@ function computeHeatmapLevel(logCount: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
+/** nowが属する月からmonths ヶ月前の月の「1日」を表すDateを返す（getJstMonthRangeUtcに渡す基準日算出用）。
+ *  日を1日に固定することで、月末日（31日等）が対象月に存在しないことによるズレを避ける。 */
+function subtractJstMonths(date: Date, months: number): Date {
+  const jstMs = date.getTime() + JST_OFFSET_MS;
+  const jstDate = new Date(jstMs);
+  const year = jstDate.getUTCFullYear();
+  const month = jstDate.getUTCMonth();
+  const targetMonthFirstAsUtcMs = Date.UTC(year, month - months, 1, 0, 0, 0, 0) - JST_OFFSET_MS;
+  return new Date(targetMonthFirstAsUtcMs);
+}
+
 /**
- * 直近windowDays日分の日別ヒートマップデータ、現在のストリーク、最長ストリークを算出する。
+ * ヒートマップ表示グリッドの開始日（月曜始まり週の月曜日 JST 0:00、UTCのDateとして返す）を算出する。
+ * 「当月＋過去5ヶ月（合計6ヶ月分）」のうち最も過去側の暦月（5ヶ月前の月）の1日を、その週の月曜まで切り下げる。
+ *
+ * 処理ロジック:
+ * 1. subtractJstMonths(now, 5)で「5ヶ月前の月」を表す基準日を求める。
+ * 2. getJstMonthRangeUtc(基準日).monthStartUtcで、その月の1日 JST 0:00 を求める。
+ * 3. getJstWeekRangeUtc(1日).weekStartUtcで、その1日が属する暦週の月曜 JST 0:00 まで切り下げる
+ *    （1日が月曜でない月は、最大6日分前月にはみ出す。要件定義書「確定事項B」で許容と確定済み）。
+ */
+export function computeHeatmapWindowStartUtc(now: Date): Date {
+  const fiveMonthsAgoMonthStartUtc = getJstMonthRangeUtc(subtractJstMonths(now, 5)).monthStartUtc;
+  return getJstWeekRangeUtc(fiveMonthsAgoMonthStartUtc).weekStartUtc;
+}
+
+/**
+ * ヒートマップ表示グリッドの日数（buildWorkoutHeatmapのdays配列長のデフォルト値）を算出する。
+ * computeHeatmapWindowStartUtc(now)（月曜0:00 JST）から、nowが属するJST暦日の0:00までの
+ * 経過日数に+1（今日自身の分）した値。月によって暦日数が異なるため固定値にはならず、
+ * 常に7の倍数になるとも限らない（最終行＝直近の週は「今日」の曜日までしか埋まらないため）。
+ */
+export function computeHeatmapWindowDays(now: Date): number {
+  const windowStartUtc = computeHeatmapWindowStartUtc(now);
+  const { dayStartUtc: todayStartUtc } = getJstDayRangeUtc(now);
+  const diffDays = Math.round((todayStartUtc.getTime() - windowStartUtc.getTime()) / (24 * 60 * 60 * 1000));
+  return diffDays + 1;
+}
+
+/**
+ * 表示グリッド（windowDays日分。デフォルトは「当月＋過去5ヶ月」を月曜始まり週に整列させた
+ * 可変長のウィンドウ）の日別ヒートマップデータ、現在のストリーク、最長ストリークを算出する。
  *
  * 処理ロジック:
  * 1. sessions（全期間）をJST暦日キー（getJstDateKey）でグルーピングし、
@@ -92,7 +131,7 @@ function computeHeatmapLevel(logCount: number): 0 | 1 | 2 | 3 {
  * 3. 現在のストリーク(currentStreak): 今日(getJstDateKey(now))にMap上の記録があれば
  *    今日を起点に、無ければ昨日を起点に、Map上に記録がある限り1日ずつ過去へ遡ってカウントする
  *    （「今日はまだジムに行っていないだけ」でストリークを0にしないための仕様）。
- * 4. 最長ストリーク(longestStreak): 1.のMapの全キー（371日の表示ウィンドウに限定しない、
+ * 4. 最長ストリーク(longestStreak): 1.のMapの全キー（表示ウィンドウ(windowDays)に限定しない、
  *    全期間）をdateKeyToDayIndexで整数化し、連続する整数の最長run長を求める。
  *    currentStreakは必ずこのrunの一部であるため、最終的にlongestStreak = max(longestStreak, currentStreak)とする。
  * 5. totalActiveDays: 2.のdays配列のうちlogCount>0の日数（表示ウィンドウ内のみ）。
@@ -100,7 +139,7 @@ function computeHeatmapLevel(logCount: number): 0 | 1 | 2 | 3 {
 export function buildWorkoutHeatmap(
   sessions: AchievementSessionInput[],
   now: Date,
-  windowDays: number = HEATMAP_WINDOW_DAYS
+  windowDays: number = computeHeatmapWindowDays(now)
 ): WorkoutHeatmapDTO {
   const dayMap = new Map<string, { sessionCount: number; logCount: number; totalCalories: number }>();
   for (const s of sessions) {
@@ -165,17 +204,6 @@ function formatWeekLabel(weekStartUtc: Date): string {
 function formatMonthLabel(monthStartUtc: Date): string {
   const jst = new Date(monthStartUtc.getTime() + JST_OFFSET_MS);
   return `${jst.getUTCFullYear()}年${jst.getUTCMonth() + 1}月`;
-}
-
-/** nowが属する月からmonths ヶ月前の月の「1日」を表すDateを返す（getJstMonthRangeUtcに渡す基準日算出用）。
- *  日を1日に固定することで、月末日（31日等）が対象月に存在しないことによるズレを避ける。 */
-function subtractJstMonths(date: Date, months: number): Date {
-  const jstMs = date.getTime() + JST_OFFSET_MS;
-  const jstDate = new Date(jstMs);
-  const year = jstDate.getUTCFullYear();
-  const month = jstDate.getUTCMonth();
-  const targetMonthFirstAsUtcMs = Date.UTC(year, month - months, 1, 0, 0, 0, 0) - JST_OFFSET_MS;
-  return new Date(targetMonthFirstAsUtcMs);
 }
 
 function aggregateBucket(

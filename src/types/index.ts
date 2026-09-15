@@ -111,12 +111,12 @@ export interface HeatmapDayDTO {
   level: 0 | 1 | 2 | 3; // 0=記録なし, 1=1-2件, 2=3-5件, 3=6件以上
 }
 
-/** カレンダーヒートマップ全体（直近371日分）＋ストリーク情報 */
+/** カレンダーヒートマップ全体（当月＋過去2ヶ月を月曜始まり週で切り下げた可変長の表示期間）＋ストリーク情報 */
 export interface WorkoutHeatmapDTO {
-  days: HeatmapDayDTO[]; // 古い→新しいの順、直近371日分
+  days: HeatmapDayDTO[]; // 古い→新しいの順。先頭は必ず月曜日、末尾は必ず今日
   currentStreak: number; // 現在の連続日数（今日未記録でも前日までの連続を維持）
   longestStreak: number; // 全期間の最長連続日数
-  totalActiveDays: number; // 直近371日中、記録がある日数
+  totalActiveDays: number; // 表示期間中、記録がある日数
 }
 
 /** 推移トレンドグラフの1バケット（1週間 or 1ヶ月）分のデータ */
