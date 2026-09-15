@@ -34,3 +34,57 @@ export function getJstDayRangeUtc(date: Date): { dayStartUtc: Date; dayEndUtc: D
     dayEndUtc: new Date(jstMidnightAsUtcMs + 24 * 60 * 60 * 1000),
   };
 }
+
+/**
+ * 指定した日時が属するJST暦日を"YYYY-MM-DD"形式のキー文字列で返す。
+ * ヒートマップの日付バケット化・ストリーク計算・自己ベストの「直近7日以内」判定で、
+ * 日付の同一性判定に用いる（getJstDayRangeUtcと同じ固定+9時間オフセット方式）。
+ */
+export function getJstDateKey(date: Date): string {
+  const jstMs = date.getTime() + JST_OFFSET_MS;
+  const jstDate = new Date(jstMs);
+  const year = jstDate.getUTCFullYear();
+  const month = String(jstDate.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(jstDate.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * UTCミリ秒空間でdays日を加算した新しいDateを返す（daysに負数を渡すと過去方向）。
+ * JSTはサマータイムが存在せず固定オフセットのため、UTC ms単位での24時間刻み加算が
+ * そのままJST暦日境界の加算と一致する（日付境界をまたぐ特別な補正は不要）。
+ */
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * 指定した日時が属するJST暦週（月曜始まり）の開始・終了（ともにUTCのDate、半開区間）を返す。
+ * 週の開始は「その週の月曜日のJST 0:00」に対応するUTC時刻。
+ */
+export function getJstWeekRangeUtc(date: Date): { weekStartUtc: Date; weekEndUtc: Date } {
+  const { dayStartUtc } = getJstDayRangeUtc(date);
+  const jstDayStart = new Date(dayStartUtc.getTime() + JST_OFFSET_MS);
+  const dayOfWeek = jstDayStart.getUTCDay(); // 0=日, 1=月, ..., 6=土
+  const daysSinceMonday = (dayOfWeek + 6) % 7; // 月曜=0, 火曜=1, ..., 日曜=6
+  const weekStartUtc = new Date(dayStartUtc.getTime() - daysSinceMonday * 24 * 60 * 60 * 1000);
+  const weekEndUtc = new Date(weekStartUtc.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return { weekStartUtc, weekEndUtc };
+}
+
+/**
+ * 指定した日時が属するJST暦月の開始・終了（ともにUTCのDate、半開区間）を返す。
+ * 月の開始は「その月1日のJST 0:00」に対応するUTC時刻。
+ */
+export function getJstMonthRangeUtc(date: Date): { monthStartUtc: Date; monthEndUtc: Date } {
+  const jstMs = date.getTime() + JST_OFFSET_MS;
+  const jstDate = new Date(jstMs);
+  const year = jstDate.getUTCFullYear();
+  const month = jstDate.getUTCMonth();
+  const monthStartAsUtcMs = Date.UTC(year, month, 1, 0, 0, 0, 0) - JST_OFFSET_MS;
+  const monthEndAsUtcMs = Date.UTC(year, month + 1, 1, 0, 0, 0, 0) - JST_OFFSET_MS;
+  return {
+    monthStartUtc: new Date(monthStartAsUtcMs),
+    monthEndUtc: new Date(monthEndAsUtcMs),
+  };
+}

@@ -1,14 +1,21 @@
-// src/app/workouts/page.tsx（実績確認: 週間・月間集計 + 履歴一覧）
+// src/app/workouts/page.tsx（実績確認: 週間・月間集計 + ビジュアル実績 + 履歴一覧）
 import Link from "next/link";
 import { getDashboardStats, listWorkoutSessions } from "@/app/actions/workouts";
+import { getAchievementsData } from "@/app/actions/achievements";
 import StatsSummaryCard from "@/components/StatsSummaryCard";
 import CalorieDisclaimer from "@/components/CalorieDisclaimer";
+import WorkoutHeatmap from "@/components/WorkoutHeatmap";
+import TrendChart from "@/components/TrendChart";
+import MuscleBalanceChart from "@/components/MuscleBalanceChart";
+import AchievementBadges from "@/components/AchievementBadges";
+import PersonalBestList from "@/components/PersonalBestList";
 
 export default async function WorkoutsPage() {
-  const [weekStats, monthStats, sessions] = await Promise.all([
+  const [weekStats, monthStats, sessions, achievements] = await Promise.all([
     getDashboardStats(7),
     getDashboardStats(30),
     listWorkoutSessions(),
+    getAchievementsData(),
   ]);
 
   return (
@@ -23,6 +30,17 @@ export default async function WorkoutsPage() {
         <StatsSummaryCard periodLabel="直近7日" stats={weekStats} />
         <StatsSummaryCard periodLabel="直近30日" stats={monthStats} />
       </div>
+
+      <WorkoutHeatmap heatmap={achievements.heatmap} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TrendChart series={achievements.trend} />
+        <MuscleBalanceChart balance={achievements.muscleBalance} />
+      </div>
+
+      <AchievementBadges badges={achievements.badges} />
+      <PersonalBestList personalBests={achievements.personalBests} />
+
       <CalorieDisclaimer />
       <h2 className="text-lg font-semibold">履歴</h2>
       {sessions.length === 0 ? (
