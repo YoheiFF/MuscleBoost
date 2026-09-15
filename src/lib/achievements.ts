@@ -92,17 +92,17 @@ function subtractJstMonths(date: Date, months: number): Date {
 
 /**
  * ヒートマップ表示グリッドの開始日（月曜始まり週の月曜日 JST 0:00、UTCのDateとして返す）を算出する。
- * 「当月＋過去5ヶ月（合計6ヶ月分）」のうち最も過去側の暦月（5ヶ月前の月）の1日を、その週の月曜まで切り下げる。
+ * 「当月＋過去4ヶ月（合計5ヶ月分）」のうち最も過去側の暦月（4ヶ月前の月）の1日を、その週の月曜まで切り下げる。
  *
  * 処理ロジック:
- * 1. subtractJstMonths(now, 5)で「5ヶ月前の月」を表す基準日を求める。
+ * 1. subtractJstMonths(now, 4)で「4ヶ月前の月」を表す基準日を求める。
  * 2. getJstMonthRangeUtc(基準日).monthStartUtcで、その月の1日 JST 0:00 を求める。
  * 3. getJstWeekRangeUtc(1日).weekStartUtcで、その1日が属する暦週の月曜 JST 0:00 まで切り下げる
  *    （1日が月曜でない月は、最大6日分前月にはみ出す。要件定義書「確定事項B」で許容と確定済み）。
  */
 export function computeHeatmapWindowStartUtc(now: Date): Date {
-  const fiveMonthsAgoMonthStartUtc = getJstMonthRangeUtc(subtractJstMonths(now, 5)).monthStartUtc;
-  return getJstWeekRangeUtc(fiveMonthsAgoMonthStartUtc).weekStartUtc;
+  const fourMonthsAgoMonthStartUtc = getJstMonthRangeUtc(subtractJstMonths(now, 4)).monthStartUtc;
+  return getJstWeekRangeUtc(fourMonthsAgoMonthStartUtc).weekStartUtc;
 }
 
 /**
@@ -119,7 +119,7 @@ export function computeHeatmapWindowDays(now: Date): number {
 }
 
 /**
- * 表示グリッド（windowDays日分。デフォルトは「当月＋過去5ヶ月」を月曜始まり週に整列させた
+ * 表示グリッド（windowDays日分。デフォルトは「当月＋過去4ヶ月」を月曜始まり週に整列させた
  * 可変長のウィンドウ）の日別ヒートマップデータ、現在のストリーク、最長ストリークを算出する。
  *
  * 処理ロジック:

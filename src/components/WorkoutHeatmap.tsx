@@ -63,7 +63,7 @@ export default function WorkoutHeatmap({ heatmap }: WorkoutHeatmapProps) {
           ))}
         </div>
       </div>
-      <p className="mt-2 text-xs text-gray-400">直近6ヶ月間の記録日数: {heatmap.totalActiveDays}日</p>
+      <p className="mt-2 text-xs text-gray-400">直近5ヶ月間の記録日数: {heatmap.totalActiveDays}日</p>
     </div>
   );
 }

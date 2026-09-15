@@ -33,12 +33,12 @@ function log(overrides: Partial<AchievementSessionInput["logs"][number]> = {}): 
 }
 
 describe("buildWorkoutHeatmap", () => {
-  it("記録が0件の場合、当月+過去5ヶ月を月曜始まりで整列した表示期間で、全セルlevel0・ストリーク0・totalActiveDays0を返す（新規ユーザー）", () => {
+  it("記録が0件の場合、当月+過去4ヶ月を月曜始まりで整列した表示期間で、全セルlevel0・ストリーク0・totalActiveDays0を返す（新規ユーザー）", () => {
     const result = buildWorkoutHeatmap([], NOW);
-    // NOW=2026-09-15(火)。5ヶ月前の月=2026年4月、4/1(水)が属する週の月曜=2026-03-30。
-    // 2026-03-30〜2026-09-15は170日間（実装コードで独立検証済み）。
-    expect(result.days).toHaveLength(170);
-    expect(result.days[0].date).toBe("2026-03-30");
+    // NOW=2026-09-15(火)。4ヶ月前の月=2026年5月、5/1(金)が属する週の月曜=2026-04-27。
+    // 2026-04-27〜2026-09-15は142日間（実装コードで独立検証済み、手計算とも一致）。
+    expect(result.days).toHaveLength(142);
+    expect(result.days[0].date).toBe("2026-04-27");
     expect(result.days[result.days.length - 1].date).toBe("2026-09-15");
     expect(result.days.every((d) => d.level === 0)).toBe(true);
     expect(result.currentStreak).toBe(0);
@@ -100,25 +100,24 @@ describe("buildWorkoutHeatmap", () => {
 });
 
 describe("computeHeatmapWindowStartUtc / computeHeatmapWindowDays", () => {
-  it("5ヶ月前の月の1日が月曜でない場合、その週の月曜まで切り下げる（月またぎ）", () => {
-    const start = computeHeatmapWindowStartUtc(NOW); // NOW=2026-09-15、5ヶ月前=4月、4/1は水曜
-    expect(getJstDateKey(start)).toBe("2026-03-30");
-    expect(computeHeatmapWindowDays(NOW)).toBe(170);
+  it("4ヶ月前の月の1日が月曜でない場合、その週の月曜まで切り下げる（月またぎ）", () => {
+    const start = computeHeatmapWindowStartUtc(NOW); // NOW=2026-09-15、4ヶ月前=5月、5/1は金曜
+    expect(getJstDateKey(start)).toBe("2026-04-27");
+    expect(computeHeatmapWindowDays(NOW)).toBe(142);
   });
 
-  it("5ヶ月前の月の1日がすでに月曜の場合は切り下げが発生しない", () => {
-    // 2026-05-04(月)を基準にすると、5ヶ月前の月=2025年12月、12/1(月)は既に月曜
-    const marNow = new Date("2026-05-04T04:00:00.000Z"); // JST 2026-05-04 13:00（月曜）
-    const start = computeHeatmapWindowStartUtc(marNow);
-    expect(getJstDateKey(start)).toBe("2025-12-01");
-    expect(computeHeatmapWindowDays(marNow)).toBe(155);
+  it("4ヶ月前の月の1日がすでに月曜の場合は切り下げが発生しない", () => {
+    // 2026-01-15(木)を基準にすると、4ヶ月前の月=2025年9月、9/1(月)は既に月曜
+    const start = computeHeatmapWindowStartUtc(new Date("2026-01-15T04:00:00.000Z"));
+    expect(getJstDateKey(start)).toBe("2025-09-01");
+    expect(computeHeatmapWindowDays(new Date("2026-01-15T04:00:00.000Z"))).toBe(137);
   });
 
   it("年をまたぐ場合も正しく暦週アライメントされる", () => {
-    const janNow = new Date("2026-01-15T04:00:00.000Z"); // JST 2026-01-15 13:00（木曜）
-    const start = computeHeatmapWindowStartUtc(janNow); // 5ヶ月前=2025年8月、8/1は金曜→月曜切り下げで7/28
-    expect(getJstDateKey(start)).toBe("2025-07-28");
-    expect(computeHeatmapWindowDays(janNow)).toBe(172);
+    const marNow = new Date("2026-05-04T04:00:00.000Z"); // JST 2026-05-04 13:00（月曜）
+    const start = computeHeatmapWindowStartUtc(marNow); // 4ヶ月前=2026年1月、1/1は木曜→月曜切り下げで2025-12-29
+    expect(getJstDateKey(start)).toBe("2025-12-29");
+    expect(computeHeatmapWindowDays(marNow)).toBe(127);
   });
 });
 
